@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="cream">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>每日成长计划</title>
+  <link rel="icon" href="data:," />
+  <!-- 主题预置：先于渲染应用本地偏好，避免刷新时闪色 -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('dgp-theme');
+        if (t === 'dark' || t === 'ocean') t = 'night';                  // 兼容旧版取值
+        if (['cream', 'night', 'mint', 'slate'].indexOf(t) < 0) t = 'cream';
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'cream');
+      }
+    })();
+  </script>
+
+  <!-- Tailwind CSS v3（CDN，免构建） -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    /* Tailwind 主题映射：颜色全部指向 style.css 中的 CSS 变量，浅/暗主题自动切换 */
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            paper: 'var(--paper)',
+            card: 'var(--card)',
+            ink: 'var(--ink)',
+            soft: 'var(--soft)',
+            faint: 'var(--faint)',
+            line: 'var(--line)',
+            accent: 'var(--accent)',
+            celadon: 'var(--celadon)',
+          },
+        },
+      },
+    };
+  </script>
+
+  <!-- Supabase JS SDK v2 稳定版（CDN） -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <link rel="stylesheet" href="style.css" />
+  <!-- 主逻辑 -->
+  <script src="app.js" defer></script>
+  <!-- 功能模块：按依赖顺序加载（均以 defer 保证 DOM 就绪） -->
+  <script src="js/categories.js" defer></script>
+  <script src="js/diary-tools.js" defer></script>
+  <script src="js/habits.js" defer></script>
+  <script src="js/goals.js" defer></script>
+  <script src="js/review.js" defer></script>
+  <script src="js/export.js" defer></script>
+</head>
+
+<body class="bg-paper text-ink min-h-screen">
+
+  <!-- ==================== 视图一：登录页 ==================== -->
+  <section id="view-login" class="hidden relative min-h-screen flex items-center justify-center p-4 overflow-hidden">
+    <!-- 水彩小装饰：小羊 / 枝叶 / 小花（仅桌面端，避免移动端拥挤） -->
+    <svg class="deco deco-sheep-lg hidden sm:block" viewBox="0 0 120 100" aria-hidden="true">
+      <g class="d-wash"><circle cx="64" cy="48" r="22"/><circle cx="44" cy="42" r="14"/><circle cx="80" cy="40" r="13"/></g>
+      <g class="d-line">
+        <ellipse cx="34" cy="50" rx="9" ry="8"/>
+        <path d="M27 44c-3-2-5-5-4-7 3 0 6 2 8 5"/>
+        <circle cx="31" cy="49" r="1.4" class="d-dot"/>
+        <path d="M48 66v9M58 68v8M68 68v8M78 66v9"/>
+        <path d="M44 70c10 3 24 3 34 0"/>
+      </g>
+    </svg>
+    <svg class="deco deco-branch-lg hidden sm:block" viewBox="0 0 100 100" aria-hidden="true">
+      <g class="d-wash-2"><ellipse cx="42" cy="62" rx="26" ry="15" transform="rotate(-30 42 62)"/><ellipse cx="70" cy="34" rx="17" ry="11" transform="rotate(-30 70 34)"/></g>
+      <g class="d-line">
+        <path d="M16 90C34 70 52 50 82 22"/>
+        <path d="M38 66c-11 1-19-4-22-13 10-2 19 3 22 13z"/>
+        <path d="M52 52c1-11-3-19-12-23-2 10 3 19 12 23z"/>
+        <path d="M66 38c11 0 19-5 22-14-10-1-19 5-22 14z"/>
+      </g>
+    </svg>
+    <svg class="deco deco-flower-lg hidden sm:block" viewBox="0 0 100 100" aria-hidden="true">
+      <g class="d-wash"><circle cx="50" cy="42" r="20"/></g>
+      <g class="d-line">
+        <path d="M50 68v20"/>
+        <path d="M50 76c-7 0-11-5-11-11 7 0 11 4 11 11z"/>
+        <circle cx="50" cy="30" r="9"/><circle cx="32" cy="42" r="9"/>
+        <circle cx="68" cy="42" r="9"/><circle cx="40" cy="56" r="9"/>
+        <circle cx="60" cy="56" r="9"/><circle cx="50" cy="43" r="5" class="d-solid"/>
+      </g>
+    </svg>
+    <div class="w-full max-w-sm card p-6 sm:p-8">
+      <div class="flex items-center gap-3 mb-6">
+        <!-- 品牌标记 -->
+        <span class="w-9 h-9 flex items-center justify-center text-white text-sm shrink-0 font-display"
+              style="background:var(--accent);border-radius:10px">成</span>
+        <div class="min-w-0">
+          <h1 class="font-display text-lg leading-tight">每日成长计划</h1>
+          <p class="text-xs text-faint">日拱一卒，功不唐捐</p>
+        </div>
+      </div>
+
+      <form id="login-form" class="space-y-4">
+        <div>
+          <label for="login-email" class="block text-sm text-soft mb-1.5">邮箱</label>
+          <input id="login-email" type="email" class="input" placeholder="请输入邮箱"
+                 autocomplete="username" required />
+        </div>
+        <div>
+          <label for="login-password" class="block text-sm text-soft mb-1.5">密码</label>
+          <input id="login-password" type="password" class="input" placeholder="请输入密码"
+                 autocomplete="current-password" required />
+        </div>
+        <p id="login-error" class="hidden text-sm leading-relaxed" style="color:var(--accent)"></p>
+        <button id="login-btn" type="submit" class="btn btn-accent w-full justify-center">登 录</button>
+      </form>
+
+      <p class="mt-5 text-xs text-faint leading-relaxed">账号由管理员统一创建，如需开通请联系管理员。</p>
+    </div>
+  </section>
+
+  <!-- ==================== 视图二：主看板 ==================== -->
+  <div id="view-board" class="hidden min-h-screen flex-col">
+
+    <!-- 全局顶部导航栏（移动端文字自动折叠为图标） -->
+    <header class="sticky top-0 z-40 topbar">
+      <div class="max-w-6xl mx-auto px-3 sm:px-6 h-12 flex items-center justify-between gap-2">
+        <h1 class="font-display text-[15px] whitespace-nowrap">每日成长计划</h1>
+        <nav class="flex items-center gap-0.5 sm:gap-1">
+          <span id="nav-user" class="hidden md:block text-xs text-faint max-w-[14rem] truncate mr-2"></span>
+
+          <!-- 主题切换：4 套主题一键切换 -->
+          <div class="relative">
+            <button id="btn-theme" class="nav-btn" type="button" title="切换主题"
+                    aria-haspopup="true" aria-expanded="false">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none" opacity=".55"/></svg>
+              <span class="hidden sm:inline">主题</span>
+            </button>
+            <div id="theme-menu" class="theme-menu hidden">
+              <p class="theme-menu-title">选择主题</p>
+              <button class="theme-opt" type="button" data-set-theme="cream">
+                <span class="swatch sw-cream"></span><span>奶油插画</span><span class="tick">✓</span>
+              </button>
+              <button class="theme-opt" type="button" data-set-theme="night">
+                <span class="swatch sw-night"></span><span>暗夜氛围</span><span class="tick">✓</span>
+              </button>
+              <button class="theme-opt" type="button" data-set-theme="mint">
+                <span class="swatch sw-mint"></span><span>薄荷绿植</span><span class="tick">✓</span>
+              </button>
+              <button class="theme-opt" type="button" data-set-theme="slate">
+                <span class="swatch sw-slate"></span><span>灰蓝文艺</span><span class="tick">✓</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 导出菜单：JSON 完整备份 / Markdown / PDF（打印另存） -->
+          <div class="relative">
+            <button id="btn-export" class="nav-btn" type="button" title="导出备份"
+                    aria-haspopup="true" aria-expanded="false">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+              <span class="hidden sm:inline">导出</span>
+            </button>
+            <div id="export-menu" class="theme-menu hidden" style="width:12.5rem">
+              <p class="theme-menu-title">导出数据</p>
+              <button class="theme-opt" type="button" data-export="json">JSON 完整备份</button>
+              <button class="theme-opt" type="button" data-export="md">Markdown 文档</button>
+              <button class="theme-opt" type="button" data-export="pdf">PDF（打印另存）</button>
+            </div>
+          </div>
+
+          <button id="btn-clear" class="nav-btn" type="button" title="清空数据（有风险）">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            <span class="hidden sm:inline">清空数据</span>
+          </button>
+
+          <!-- 管理员专区入口：仅 is_admin 用户可见 -->
+          <button id="btn-admin" class="nav-btn hidden" type="button" title="用户管理（管理员）">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span class="hidden sm:inline">用户管理</span>
+          </button>
+
+          <button id="btn-logout" class="nav-btn" type="button" title="退出登录">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            <span class="hidden sm:inline">退出</span>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- 四大核心模块：移动端单列堆叠；桌面端 前三列一行 + 日记通栏 -->
+    <main class="flex-1 w-full max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-7 grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 items-start">
+
+      <!-- 模块1：每日状态记录 -->
+      <section id="card-status" class="card lg:col-start-1 lg:row-start-1">
+        <!-- 水彩小装饰：咖啡杯 -->
+        <svg class="deco deco-cup" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="d-wash"><ellipse cx="44" cy="66" rx="28" ry="10"/><path d="M22 40h44v12a18 18 0 0 1-18 18h-8a18 18 0 0 1-18-18z"/></g>
+          <g class="d-line">
+            <path d="M22 40h44v12a18 18 0 0 1-18 18h-8a18 18 0 0 1-18-18z"/>
+            <path d="M66 44h7a7 7 0 0 1 0 14h-7"/>
+            <path d="M14 76h62"/>
+            <path d="M38 30c5-4 1-8 5-12M50 30c5-4 1-8 5-12"/>
+          </g>
+        </svg>
+        <div class="mb-3">
+          <h2 class="card-title">每日状态</h2>
+          <p id="date-label" class="text-xs text-faint mt-1.5"></p>
+        </div>
+        <p id="status-loading" class="hidden text-xs text-faint mb-2">加载中…</p>
+
+        <div id="mood-group" class="flex gap-1.5 mb-3"></div>
+
+        <textarea id="status-content" class="input" rows="5" maxlength="300"
+                  placeholder="今天的状态如何？写几句吧…"></textarea>
+        <div class="flex items-center justify-between mt-1.5">
+          <span id="status-hint" class="save-hint"></span>
+          <span id="status-count" class="text-xs text-faint">0 / 300</span>
+        </div>
+      </section>
+
+      <!-- 模块2：Todo 待办清单 -->
+      <section id="card-todo" class="card lg:col-start-2 lg:row-start-1">
+        <!-- 水彩小装饰：小盆栽 -->
+        <svg class="deco deco-plant" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="d-wash-2"><ellipse cx="50" cy="70" rx="26" ry="8"/><ellipse cx="36" cy="42" rx="12" ry="16" transform="rotate(-24 36 42)"/><ellipse cx="64" cy="42" rx="12" ry="16" transform="rotate(24 64 42)"/></g>
+          <g class="d-line">
+            <path d="M30 58h40l-5 22H35z"/>
+            <path d="M50 58V26"/>
+            <path d="M50 48c-9 0-15-6-15-15 9-1 15 5 15 15z"/>
+            <path d="M50 40c9 0 15-6 15-15-9-1-15 5-15 15z"/>
+            <path d="M27 58h46"/>
+          </g>
+        </svg>
+        <div class="flex items-center justify-between mb-3 gap-2">
+          <h2 class="card-title">待办清单</h2>
+          <span id="todo-count" class="text-xs text-faint"></span>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-3">
+          <input id="todo-input" class="input flex-1 min-w-[8rem]" placeholder="添加待办…" />
+          <select id="todo-priority" class="input w-16 shrink-0" title="优先级">
+            <option value="高">高</option>
+            <option value="中" selected>中</option>
+            <option value="低">低</option>
+          </select>
+          <button id="todo-add" class="btn btn-accent shrink-0" type="button">添加</button>
+        </div>
+
+        <p id="todo-loading" class="hidden text-xs text-faint">加载中…</p>
+        <ul id="todo-list" class="space-y-2"></ul>
+        <p id="todo-empty" class="hidden text-sm text-faint py-4">这一天还没有待办，添加一个吧。</p>
+
+        <div id="todo-done-wrap" class="hidden mt-3 border-t border-line pt-2">
+          <button id="todo-done-toggle" class="text-xs text-accent hover:underline" type="button">查看已完成</button>
+          <ul id="todo-done-list" class="hidden space-y-2 mt-2"></ul>
+        </div>
+      </section>
+
+      <!-- 模块4：日历组件（桌面端占第三列，DOM 顺序保持移动端 1→2→3→4） -->
+      <section id="card-cal" class="card lg:col-start-3 lg:row-start-1">
+        <!-- 水彩小装饰：枝叶 -->
+        <svg class="deco deco-branch" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="d-wash-2"><ellipse cx="42" cy="62" rx="26" ry="15" transform="rotate(-30 42 62)"/><ellipse cx="70" cy="34" rx="17" ry="11" transform="rotate(-30 70 34)"/></g>
+          <g class="d-line">
+            <path d="M16 90C34 70 52 50 82 22"/>
+            <path d="M38 66c-11 1-19-4-22-13 10-2 19 3 22 13z"/>
+            <path d="M52 52c1-11-3-19-12-23-2 10 3 19 12 23z"/>
+            <path d="M66 38c11 0 19-5 22-14-10-1-19 5-22 14z"/>
+          </g>
+        </svg>
+        <div class="flex items-center justify-between mb-2 gap-2">
+          <h2 class="card-title">日历</h2>
+          <div class="flex items-center gap-0.5">
+            <button id="cal-prev" class="nav-btn text-sm px-1.5" type="button" title="上一月">‹</button>
+            <span id="cal-title" class="text-xs text-soft min-w-[5.5rem] text-center"></span>
+            <button id="cal-next" class="nav-btn text-sm px-1.5" type="button" title="下一月">›</button>
+            <button id="cal-today" class="nav-btn text-xs" type="button" title="回到今天">今</button>
+          </div>
+        </div>
+        <div id="cal-grid" class="cal-grid"></div>
+        <div class="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
+          <span class="inline-flex items-center gap-1"><i class="dot dot-status"></i>状态</span>
+          <span class="inline-flex items-center gap-1"><i class="dot dot-todo"></i>待办</span>
+          <span class="inline-flex items-center gap-1"><i class="dot dot-diary"></i>日记</span>
+        </div>
+      </section>
+
+      <!-- 模块3：日记笔记（桌面端第二行通栏，移动端排在第三个） -->
+      <section id="card-diary" class="card lg:col-span-3 lg:row-start-2">
+        <!-- 水彩小装饰：小花（淡作背景，不干扰书写） -->
+        <svg class="deco deco-flower" style="left:auto;right:12px;top:-6px;bottom:auto;width:76px;opacity:.34" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="d-wash"><circle cx="50" cy="42" r="20"/></g>
+          <g class="d-line">
+            <path d="M50 68v20"/>
+            <path d="M50 76c-7 0-11-5-11-11 7 0 11 4 11 11z"/>
+            <circle cx="50" cy="30" r="9"/><circle cx="32" cy="42" r="9"/>
+            <circle cx="68" cy="42" r="9"/><circle cx="40" cy="56" r="9"/>
+            <circle cx="60" cy="56" r="9"/><circle cx="50" cy="43" r="5" class="d-solid"/>
+          </g>
+        </svg>
+        <div class="flex items-center gap-3 flex-wrap mb-2.5">
+          <h2 class="card-title">日记笔记</h2>
+          <span id="diary-hint" class="save-hint"></span>
+          <span class="flex-1"></span>
+          <span id="diary-wordcount" class="text-xs text-faint">本日 0 字</span>
+        </div>
+
+        <!-- 日记工具条：模板 / 分类筛选 / 全文搜索 / 时光回溯 / AI 推荐 -->
+        <div class="diary-toolbar">
+          <div class="relative">
+            <button id="btn-template" class="btn" type="button" aria-haspopup="true" aria-expanded="false">日记模板</button>
+            <div id="template-menu" class="theme-menu hidden" style="left:0;right:auto;width:13rem"></div>
+          </div>
+          <select id="diary-filter" class="input diary-filter" title="按分类筛选日记">
+            <option value="">全部分类</option>
+          </select>
+          <input id="diary-search" class="input diary-search" placeholder="全文搜索日记…" />
+          <button id="btn-travel" class="btn" type="button" title="随机调取一篇过往日记">时光回溯</button>
+          <button id="btn-ai-cat" class="btn" type="button" title="根据正文智能推荐分类">AI 推荐分类</button>
+        </div>
+
+        <!-- 当前日记的分类标签 -->
+        <div id="diary-cats" class="flex flex-wrap items-center gap-1.5 mb-2 min-h-[1.4rem]"></div>
+
+        <textarea id="diary-content" class="input" rows="10"
+                  placeholder="长文记录，支持换行分段，落笔即成长…"></textarea>
+        <div class="flex items-center gap-2 mt-1.5">
+          <span id="diary-month-words" class="text-xs text-faint"></span>
+          <span class="flex-1"></span>
+          <button id="btn-edit-cats" class="link-btn text-xs" type="button">编辑分类</button>
+        </div>
+
+        <!-- 筛选 / 搜索结果（默认隐藏） -->
+        <div id="diary-results" class="hidden mt-3"></div>
+      </section>
+
+      <!-- 模块5：习惯打卡（桌面端第三行左） -->
+      <section id="card-habit" class="card lg:col-start-1 lg:row-start-3">
+        <!-- 水彩小装饰：枝叶 -->
+        <svg class="deco deco-branch" viewBox="0 0 100 100" aria-hidden="true">
+          <g class="d-wash-2"><ellipse cx="42" cy="62" rx="26" ry="15" transform="rotate(-30 42 62)"/><ellipse cx="70" cy="34" rx="17" ry="11" transform="rotate(-30 70 34)"/></g>
+          <g class="d-line">
+            <path d="M16 90C34 70 52 50 82 22"/>
+            <path d="M38 66c-11 1-19-4-22-13 10-2 19 3 22 13z"/>
+            <path d="M52 52c1-11-3-19-12-23-2 10 3 19 12 23z"/>
+            <path d="M66 38c11 0 19-5 22-14-10-1-19 5-22 14z"/>
+          </g>
+        </svg>
+        <div class="flex items-center justify-between mb-3 gap-2">
+          <h2 class="card-title">习惯打卡</h2>
+          <span id="habit-count" class="text-xs text-faint"></span>
+        </div>
+
+        <div class="flex flex-wrap gap-2 mb-3">
+          <select id="habit-icon" class="input w-14 shrink-0" title="选择图标">
+            <option value="🌱">🌱</option>
+            <option value="📖">📖</option>
+            <option value="💧">💧</option>
+            <option value="🏃">🏃</option>
+            <option value="🧘">🧘</option>
+            <option value="😴">😴</option>
+          </select>
+          <input id="habit-input" class="input flex-1 min-w-[6rem]" placeholder="新习惯，如：早睡" maxlength="20" />
+          <button id="habit-add" class="btn btn-accent shrink-0" type="button">添加</button>
+        </div>
+
+        <p id="habit-loading" class="hidden text-xs text-faint">加载中…</p>
+        <ul id="habit-list" class="space-y-2"></ul>
+        <p id="habit-empty" class="hidden text-sm text-faint py-3">还没有习惯，添加第一个吧。</p>
+      </section>
+
+      <!-- 模块6：目标管理（桌面端第三行右侧两列） -->
+      <section id="card-goal" class="card lg:col-span-2 lg:row-start-3">
+        <div class="flex items-center justify-between mb-3 gap-2">
+          <h2 class="card-title">目标管理</h2>
+          <span id="goal-count" class="text-xs text-faint"></span>
+        </div>
+
+        <div class="goal-form">
+          <input id="goal-title" class="input" placeholder="目标名称，如：本月读完 3 本书" maxlength="40" />
+          <select id="goal-type" class="input" title="周期类型">
+            <option value="month">月度</option>
+            <option value="quarter">季度</option>
+          </select>
+          <select id="goal-period" class="input" title="目标周期"></select>
+          <select id="goal-source" class="input" title="进度来源">
+            <option value="manual">手动记录</option>
+            <option value="todo">已完成待办</option>
+            <option value="habit">习惯打卡</option>
+          </select>
+          <select id="goal-habit" class="input hidden" title="绑定习惯"></select>
+          <input id="goal-target" class="input" type="number" min="1" value="30" title="目标数值" />
+          <button id="goal-add" class="btn btn-accent" type="button">添加目标</button>
+        </div>
+
+        <p id="goal-loading" class="hidden text-xs text-faint mt-2">加载中…</p>
+        <ul id="goal-list" class="space-y-2 mt-2"></ul>
+        <p id="goal-empty" class="hidden text-sm text-faint py-3">暂时没有进行中的目标。</p>
+      </section>
+
+      <!-- 模块7：复盘仪表盘（桌面端第四行通栏） -->
+      <section id="card-review" class="card lg:col-span-3 lg:row-start-4">
+        <div class="flex items-center justify-between mb-3 gap-2 flex-wrap">
+          <h2 class="card-title">复盘仪表盘</h2>
+          <span id="review-period" class="text-xs text-faint"></span>
+        </div>
+
+        <div class="review-grid">
+          <div class="review-panel">
+            <p class="review-title">本月情绪占比</p>
+            <div class="flex items-center gap-4">
+              <div id="mood-donut" class="donut"><span id="mood-donut-center">暂无<br>记录</span></div>
+              <div id="mood-legend" class="flex-1 min-w-0 space-y-1"></div>
+            </div>
+          </div>
+          <div class="review-panel">
+            <p class="review-title">日记分类分布</p>
+            <div id="cat-bars" class="space-y-2"></div>
+          </div>
+          <div class="review-panel">
+            <p class="review-title">总数据看板</p>
+            <div id="totals" class="totals-grid"></div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== 管理员：用户管理弹窗 ==================== -->
+  <div id="admin-modal" class="modal-mask hidden">
+    <div class="modal-panel w-full max-w-3xl max-h-[85vh] flex flex-col">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-line shrink-0">
+        <h3 class="card-title">用户管理</h3>
+        <button id="admin-close" class="nav-btn text-sm" type="button">关闭</button>
+      </div>
+      <div class="flex flex-col md:flex-row flex-1 min-h-0">
+        <!-- 左：用户列表 -->
+        <div class="md:w-60 md:border-r border-b md:border-b-0 border-line p-3 overflow-y-auto scroll-area shrink-0 max-h-[42%] md:max-h-none">
+          <p id="admin-list-loading" class="text-xs text-faint mb-2">正在获取用户…</p>
+          <ul id="admin-user-list" class="space-y-1"></ul>
+        </div>
+        <!-- 右：该用户全部记录（只读） -->
+        <div class="flex-1 min-h-0 p-3 overflow-y-auto scroll-area">
+          <div id="admin-detail-empty" class="text-sm text-faint py-8">从左侧选择一位用户，查看其全部记录。</div>
+          <div id="admin-detail" class="hidden">
+            <div class="flex flex-wrap items-center gap-2 mb-3">
+              <span id="admin-detail-user" class="text-sm text-soft break-all"></span>
+              <span class="flex-1"></span>
+              <button id="admin-disable" class="btn text-xs btn-risk" type="button">禁用账号</button>
+              <button id="admin-export" class="btn text-xs" type="button">导出该用户数据</button>
+              <button id="admin-clear" class="btn text-xs btn-risk" type="button">清空该用户数据</button>
+            </div>
+            <div id="admin-detail-body" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 日记分类：选择弹窗 ==================== -->
+  <div id="category-modal" class="modal-mask hidden">
+    <div class="modal-panel w-full max-w-md p-5">
+      <div class="flex items-baseline justify-between mb-1 gap-2">
+        <h3 class="card-title">为日记选择分类</h3>
+        <span id="cat-modal-date" class="text-xs text-faint"></span>
+      </div>
+      <p class="text-xs text-faint mb-3">可多选，分类会同步到日历圆点与复盘统计。</p>
+
+      <div id="cat-chips" class="flex flex-wrap gap-1.5 mb-3"></div>
+
+      <div class="flex gap-2 mb-3">
+        <input id="cat-new-name" class="input flex-1" maxlength="12" placeholder="新增自定义分类…" />
+        <button id="cat-new-add" class="btn shrink-0" type="button">新增</button>
+      </div>
+
+      <p id="cat-ai-hint" class="text-xs text-faint mb-3 leading-relaxed"></p>
+
+      <div class="flex justify-end gap-2">
+        <button id="cat-cancel" class="btn" type="button">稍后再选</button>
+        <button id="cat-save" class="btn btn-accent" type="button">保存分类</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 时光回溯：随机调取过往日记 ==================== -->
+  <div id="travel-modal" class="modal-mask hidden">
+    <div class="modal-panel w-full max-w-lg p-5">
+      <div class="flex items-center justify-between mb-2 gap-2">
+        <h3 class="card-title">时光回溯</h3>
+        <span id="travel-date" class="text-xs text-faint"></span>
+      </div>
+      <div id="travel-body" class="text-sm text-soft whitespace-pre-wrap leading-relaxed max-h-[50vh] overflow-y-auto scroll-area"></div>
+      <div id="travel-cats" class="flex flex-wrap gap-1.5 mt-2"></div>
+      <div class="flex justify-end gap-2 mt-4">
+        <button id="travel-again" class="btn" type="button">再抽一篇</button>
+        <button id="travel-go" class="btn" type="button">回到那天</button>
+        <button id="travel-close" class="btn btn-accent" type="button">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== 清空数据：二次确认弹窗 ==================== -->
+  <div id="confirm-modal" class="modal-mask hidden">
+    <div class="modal-panel w-full max-w-sm p-5">
+      <h3 class="card-title mb-2">清空数据</h3>
+      <p id="confirm-text" class="text-sm text-soft mb-1 leading-relaxed">
+        此操作将删除全部每日状态、待办与日记记录，且无法恢复。
+      </p>
+      <p class="text-xs mb-3" style="color:var(--accent)">请输入「确认清空」以继续：</p>
+      <input id="confirm-input" class="input mb-4" placeholder="确认清空" autocomplete="off" />
+      <div class="flex justify-end gap-2">
+        <button id="confirm-cancel" class="btn" type="button">取消</button>
+        <button id="confirm-ok" class="btn btn-accent" type="button" disabled>确认清空</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全局轻提示 -->
+  <div id="toast" role="status"></div>
+</body>
+</html>
